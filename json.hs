@@ -128,26 +128,19 @@ allowed = sat (\x -> not (elem x ['\\', '"']))
 
 jparray = do char '['
              jpws
-             maybeval <- values
+             maybeval <- sepBy (char ',') jpvalue +++ return []
              jpws
              char ']'
              return (JArray maybeval)
 
--- one or more values
-values = do val <- jpvalue
-            vals <- many nextval
-            return (val:vals)
+-- parser for separators, parser for elements
+sepBy :: Parser a -> Parser b -> Parser [b]
+sepBy sep ele = do val <- ele
+                   vals <- many (sep Main.>> ele) 
+                   return (val:vals)
 
-nextval = do char ','
-             val <- jpvalue
-             return val
-
---jparray = do char '['
-             
 ws = char ' ' +++ char '\t' +++ char '\n'
 jpws = many ws
-
-
 
 jpvalue = jpnull +++ jpbool +++ jpstring +++ jpnumber +++ jparray 
 
