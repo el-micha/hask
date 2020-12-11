@@ -119,24 +119,36 @@ jpbool = do b <- string "true" +++ string "false"
 jpnumber = do res <- numFrac
               return (JNumber res)
 
-jpstring = do char '"'
-              allowed <- many allowed
-              char '"'
-              return (JString allowed)
+jpstring = do res <- sanestring
+              return (JString res)
+
+sanestring = do char '"'
+                symbols <- many allowed
+                char '"'
+                return symbols
 
 allowed = sat (\x -> not (elem x ['\\', '"']))
 
-jparray = do char '['
+jparray = do jpws
+             char '['
              jpws
              maybeval <- sepBy (char ',') jpvalue +++ return []
              jpws
              char ']'
+             jpws
              return (JArray maybeval)
+
+--jpobject = do jpws
+--              char '{'
+--              key <- string
 
 -- parser for separators, parser for elements
 sepBy :: Parser a -> Parser b -> Parser [b]
-sepBy sep ele = do val <- ele
-                   vals <- many (sep Main.>> ele) 
+sepBy sep ele = do jpws
+                   val <- ele
+                   jpws
+                   vals <- many (jpws Main.>> sep Main.>> jpws Main.>> ele)
+                   jpws
                    return (val:vals)
 
 ws = char ' ' +++ char '\t' +++ char '\n'
