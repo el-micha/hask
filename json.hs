@@ -1,5 +1,5 @@
 -- json parser
-
+import System.IO
 
 data JValue = JNull 
             | JBool Bool 
@@ -8,6 +8,15 @@ data JValue = JNull
             | JArray [JValue] 
             | JObject [(String, JValue)]
               deriving (Eq, Ord, Show)
+
+--instance Show JValue where
+--  show JNull = "null"
+--  show (JBool b) = show b
+--  show (JNumber n) = show n
+--  show (JString s) = show s
+--  show (JArray xs) = show xs
+--  show (JObject (o:[])) = "{" ++ "\n" ++ (show o) ++ "\n" ++  "}"
+--  show (JObject (o:os)) = "{" ++ "\n" ++ (show o) ++ "\n" ++ (show os) ++ "\n" ++ "}"
 
 -- =============================================================
 
@@ -138,9 +147,24 @@ jparray = do jpws
              jpws
              return (JArray maybeval)
 
---jpobject = do jpws
---              char '{'
---              key <- string
+jpobject = do jpws
+              char '{'
+              jpws
+              kvpairs <- sepBy (char ',') kvpair +++ return []
+              jpws
+              char '}'
+              jpws
+              return (JObject kvpairs)
+
+kvpair = do jpws
+            key <- sanestring
+            jpws
+            char ':'
+            jpws
+            value <- jpvalue
+            jpws
+            return (key, value)
+
 
 -- parser for separators, parser for elements
 sepBy :: Parser a -> Parser b -> Parser [b]
@@ -154,10 +178,15 @@ sepBy sep ele = do jpws
 ws = char ' ' +++ char '\t' +++ char '\n'
 jpws = many ws
 
-jpvalue = jpnull +++ jpbool +++ jpstring +++ jpnumber +++ jparray 
+jpvalue = jpnull ||| jpbool ||| jpstring ||| jpnumber ||| jparray ||| jpobject
 
 
 
+
+main = do
+  contents <- readFile "testjson.json"
+  let json = completeParse jpvalue contents
+  putStr (show json)
 
 
 
