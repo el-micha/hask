@@ -1,4 +1,3 @@
-
 -- edit distance
 
 data Edit = Change Char | Copy | Delete | Insert Char
@@ -24,6 +23,26 @@ cost :: [Edit] -> Int
 cost = length . filter (/=Copy)
 
 dist x y = cost $ transform x y
+-- ==================================================================
+
+Tree a = Leaf | Node a (Tree a) (Tree a)
+
+-- tree manipulations: 
+-- change content of Node
+-- change structure:
+--   delete tree
+--   insert tree
+--   replace tree with other tree
+--   
+-- "node deletions, insertions, and replacements that are necessary to transform one tree into another."
+
+-- data Edit = Change Char | Copy | Delete | Insert Char
+--   deriving (Eq, Show)
+
+data TEdit = Copy | Change a | Delete | Insert (Tree a) | Replace
+
+-- but... replace = move? 
+
 
 
 

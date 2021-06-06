@@ -1,3 +1,53 @@
+import Control.Monad.State.Lazy
+
+data Tree a = Leaf | Node a (Tree a) (Tree a)
+  deriving Show
+
+
+test = Node "a" (Node "b" (Node "c" Leaf Leaf) (Node "d" Leaf Leaf)) (Leaf)
+
+-- 1 replacement UND ein state update
+
+-- State s a = State s -> (a, s)
+-- State Int (Tree a)
+--       state result
+
+step :: Tree a -> State Int (Tree Int)
+step Leaf = return Leaf
+step (Node x l r) = do newL <- step l
+                       modify (+1)
+                       newX <- get
+                       newR <- step r
+                       return (Node newX newL newR)
+
+
+-- =============================================================
+
+match :: String -> Bool
+match = go [] 
+  where go :: String -> String -> Bool
+        go [] [] = True
+        go (s:ss) [] = False
+        go ss@(s:st) xs@(x:xt)
+          | not (relevant x)  = go ss xt
+          | opening x         = go (x:ss) xs
+          | not (matches x s) = False
+          | otherwise         = go st xt
+        
+
+relevant :: Char -> Bool
+relevant c = elem c "(){}"
+
+matches :: Char -> Char -> Bool
+matches '(' ')' = True
+matches '{' '}' = True
+matches _ _ = False
+
+opening :: Char -> Bool
+opening c = elem c "({"
+
+-- ==================================================
+
 
 risers :: Ord a => [a] -> [[a]]
 risers xs = reverse $ map reverse $ filter (not . null) $ go [[]] xs
@@ -11,20 +61,43 @@ risers xs = reverse $ map reverse $ filter (not . null) $ go [[]] xs
          notLesser a (x:xs) = a >= x
 
 
-type Poly a = [(Integer,  [a])]
+type Poly a = [(Integer, [a])]
+
+testp :: Poly String
+testp = [(3, ["x", "y"]), (1, ["y", "y"])]
 
 evalPoly :: (a -> Integer) -> Poly a -> Integer
-evalPoly f p = sum $ map apply p
-  where apply (i, xs) = product $ [i] ++ map f xs
+evalPoly f p = sum $ map helper p
+  where helper (i, xs) = product $ [i] ++ (map f xs)
 
-testp = [(3, ["X", "Y"]), (1, ["Y", "Y"])]
 
 mapping :: String -> Integer
-mapping "X" = 2
-mapping "Y" = 3
-mapping "Z" = 5
+mapping "x" = 2
+mapping "y" = 3
+mapping "z" = 5
 
--- rest: see laptop
+data SymbExpr a = Var a | Lit Integer | Add (SymbExpr a) (SymbExpr a) | Mul (SymbExpr a) (SymbExpr a)
+
+instance Show a => Show (SymbExpr a) where
+  show (Var x) = show x
+  show (Lit x) = show x
+  show (Add x y) = "(" ++ (show x) ++ " + " ++ (show y) ++ ")"
+  show (Mul x y) = "(" ++ (show x) ++ " * " ++ (show y) ++ ")"
+
+foldSymbExpr :: (a -> b) -> (Integer -> b) -> (b -> b -> b) -> (b -> b -> b) -> SymbExpr a -> b
+foldSymbExpr fvar flit fadd fmul (Var x) = fvar x
+foldSymbExpr fvar flit fadd fmul (Lit x) = flit x
+foldSymbExpr fvar flit fadd fmul (Add x y) = fadd (foldSymbExpr fvar flit fadd fmul x) (foldSymbExpr fvar flit fadd fmul y)
+foldSymbExpr fvar flit fadd fmul (Mul x y) = fmul (foldSymbExpr fvar flit fadd fmul x) (foldSymbExpr fvar flit fadd fmul y)
+
+toPoly :: SymbExpr a -> Poly a
+toPoly = foldSymbExpr fvar flit fadd fmul
+  where flit x = [(x, [])]
+        fvar x = [(1, [x])]
+        fadd = (++)
+        fmul xs ys = [(xi * yi, xv ++ yv) | (xi, xv) <- xs, (yi, yv) <- ys]
+
+expr = Mul (Add (Var "y") (Var "x")) (Add (Var "x") (Lit 14))
 
 -- ===================================================================
 -- ex 7.5 regexp with parsing
