@@ -199,8 +199,9 @@ piteration = patom ||| (do x <- patom
                            return (Iter x))
 
 psequence :: Parser Regexp
-psequence = do xs <- (many1 piteration)
-               return (Seq xs)
+psequence = piteration |||
+            (do xs <- (many1 piteration)
+                return (Seq xs))
 
 pregexp :: Parser Regexp
 pregexp = psequence ||| (do x <- psequence
@@ -220,9 +221,10 @@ data Regexp' = Literal' Char | Seq' [Regexp'] | Or' Regexp' Regexp' | Iter' Rege
 helper :: Regexp -> Parser Bool
 helper (Literal x) = do c <- item
                         return (c == x)
-helper (Or x y) = do xx <- helper x
-                     yy <- helper y
-                     return (xx || yy)
+--helper (Or x y) = do xx <- helper x
+--                     yy <- helper y
+--                     return (xx || yy)
+helper (Or x y) = (helper x) ||| (helper y)
 helper (Seq xs) = do bools <- mapM helper xs
                      return (all id bools)
 helper (Iter x) = do bools <- many1 (helper x)
@@ -243,6 +245,8 @@ completeParse' p inp
 matches :: String -> String -> Bool
 matches rex s = completeParse' (regexpParser rex) s
 
+match2 :: Regexp -> String -> Bool
+match2 rex s = completeParse' (helper rex) s
 
 
 
