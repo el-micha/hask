@@ -1,4 +1,6 @@
 import Control.Monad.State.Lazy
+import Data.List
+
 
 data Tree a = Leaf | Node a (Tree a) (Tree a)
   deriving Show
@@ -31,17 +33,17 @@ match = go []
         go ss@(s:st) xs@(x:xt)
           | not (relevant x)  = go ss xt
           | opening x         = go (x:ss) xs
-          | not (matches x s) = False
+          | not (matches' x s) = False
           | otherwise         = go st xt
         
 
 relevant :: Char -> Bool
 relevant c = elem c "(){}"
 
-matches :: Char -> Char -> Bool
-matches '(' ')' = True
-matches '{' '}' = True
-matches _ _ = False
+matches' :: Char -> Char -> Bool
+matches' '(' ')' = True
+matches' '{' '}' = True
+matches' _ _ = False
 
 opening :: Char -> Bool
 opening c = elem c "({"
@@ -165,15 +167,81 @@ many1 p = do t <- p
              return (t:ts)
 -- ################################################################################
 
-data Regexp = Lit Char | Seq Regexp Regexp | Or Regexp Regexp | Iter Regexp
+
+data Regexp = Literal Char | Seq [Regexp] | Or Regexp Regexp | Iter Regexp
   deriving Show
 
+--instance Show Regexp where 
+--  show (Literal x) = [x]
+--  show (Seq xs) = intersperse ',' $ concat (map show xs)
+--  show (Or x y) = "(" ++ show x ++ "|" ++ show y ++ ")"
+--  show (Iter x) = show x ++ "+"
+
 str2regexp :: String -> Regexp
-str2regexp = undefined
+str2regexp = completeParse pregexp
 
+valid :: Char -> Bool
+valid c = notElem c "()+|"
 
+pchar :: Parser Regexp
+pchar = do x <- item
+           if valid x then return (Literal x) else failure
 
+patom :: Parser Regexp
+patom = pchar ||| (do char '(' 
+                      x <- pregexp
+                      char ')'
+                      return x)
 
+piteration :: Parser Regexp
+piteration = patom ||| (do x <- patom
+                           char '+'
+                           return (Iter x))
+
+psequence :: Parser Regexp
+psequence = do xs <- (many1 piteration)
+               return (Seq xs)
+
+pregexp :: Parser Regexp
+pregexp = psequence ||| (do x <- psequence
+                            char '|' 
+                            y <- pregexp
+                            return (Or x y))
+
+-- ===
+regexpParser :: String -> Parser Bool
+regexpParser s = helper $ str2regexp s
+
+re1 = str2regexp "a(b|c)d"
+re2 = str2regexp "ab+|d(e|f)+gh"
+
+data Regexp' = Literal' Char | Seq' [Regexp'] | Or' Regexp' Regexp' | Iter' Regexp'
+
+helper :: Regexp -> Parser Bool
+helper (Literal x) = do c <- item
+                        return (c == x)
+helper (Or x y) = do xx <- helper x
+                     yy <- helper y
+                     return (xx || yy)
+helper (Seq xs) = do bools <- mapM helper xs
+                     return (all id bools)
+helper (Iter x) = do bools <- many1 (helper x)
+                     return (all id bools)
+
+--completeParse :: Parser a -> String -> a
+--completeParse p inp
+--  | null results = error "Parse unsuccessful"
+--  | otherwise     = head results
+--  where results = [res | (res, "") <- parse p inp]
+
+completeParse' :: Parser Bool -> String -> Bool
+completeParse' p inp
+  | null results = False
+  | otherwise     = any id results
+  where results = [res | (res, "") <- parse p inp]
+
+matches :: String -> String -> Bool
+matches rex s = completeParse' (regexpParser rex) s
 
 
 
