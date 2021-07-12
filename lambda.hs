@@ -5,6 +5,8 @@ import Parsers
 
 isLetter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 
+isDigit c = c >= '0' && c <= '9'
+
 spaces :: Parser String
 spaces = many $ sat (==' ')
 
@@ -52,13 +54,23 @@ plam' = pvar' ||| papp' ||| pabs'
 
 -- attempt 2 with given grammar: 
 
-data Term = Id String | Ap Term Term | Lam String Term
+data Term = Id String | Ap Term Term | Lam String Term | Lit Int | Plus Term Term
   deriving Show
 
-atom = ident ||| lamb ||| paren
+atom = ident ||| lamb ||| paren ||| lit ||| plus
 
 ident = do s <- identifier
            return (Id s)
+
+lit = do n <- many1 $ sat isDigit
+         return $ Lit (read n)
+
+plus = do char '('
+          t1 <- term
+          char '+'
+          t2 <- term
+          char ')'
+          return (Plus t1 t2)
 
 lamb = do char '%'
           ids <- many1 identifier
@@ -80,9 +92,10 @@ str2term = completeParse term
 
 pretty :: Term -> String
 pretty (Id s) = s
+pretty (Lit n) = show n
 pretty (Ap t1 t2) = "(" ++ (pretty t1) ++ " " ++ (pretty t2) ++ ")"
 pretty (Lam s t) = "(%" ++ s ++ ". " ++ (pretty t) ++ ")"
-
+pretty (Plus t1 t2) = "(" ++ (pretty t1) ++ "+" ++ (pretty t2) ++ ")"
 
 
 
