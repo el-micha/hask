@@ -106,6 +106,8 @@ pretty (Lam s t) = "(%" ++ s ++ ". " ++ (pretty t) ++ ")"
 
 t1 = str2term "%z.(%x y.(y x z))"
 t2 = str2term "%z.(%x y.(y x z)t)"
+t3 = str2term "(%x y.x)a b"
+t4 = str2term "(%x.(%y.y)x)"
 
 -- pretty $ str2term "(%x y.(y+(x+2))+3)"
 -- =================================================================
@@ -117,13 +119,35 @@ free (Id s) = Set.singleton s
 free (Ap t1 t2) = Set.union (free t1) (free t2)
 free (Lam s t) = Set.difference (free t) (Set.singleton s)
 
+-- data Term = Id String | Ap Term Term | Lam String Term
+
 -- subst t v s = t[v <- s]
 subst :: Term -> String -> Term -> Term
+subst (Id x) v s = if x == v then s else (Id x)
+subst (Ap t1 t2) v s = Ap (subst t1 v s) (subst t2 v s)
+subst (Lam x t) v s = if x == v then (Lam x t) else
+  case Set.member x (free s) of 
+    False -> Lam x (subst t v s)
+    True  -> Lam z (subst (subst t x (Id z)) v s)
+      where z = fresh $ Set.union (free s) (free t)
+            fresh m = (foldr max "" m) ++ "'"
 
+beta :: Term -> Term -> Term
+beta (Lam x m) n = subst m x n
 
+eager :: Term -> Term
+eager (Id x) = Id x
+eager (Lam x t) = Lam x (eager t)
+eager (Ap t1 t2) = case eager t1 of
+  (Lam x t) -> eager $ beta (Lam x t) (eager t2)
+  otherwise -> Ap (eager t1) (eager t2) -- or throw error here
 
-
-
+lazy :: Term -> Term
+lazy (Id x) = Id x
+lazy (Lam x t) = Lam x t
+lazy (Ap t1 t2) = case lazy t1 of
+  (Lam x t) -> lazy $ beta (Lam x t) t2
+  otherwise -> Ap (lazy t1) t2
 
 
 
