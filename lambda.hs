@@ -150,15 +150,37 @@ lazy (Ap t1 t2) = case lazy t1 of
   otherwise -> Ap (lazy t1) t2
 
 
+-- next: 
+-- - add error handling, ErrorT
+-- - logging step by step, WriterT
+-- - introduce literal values and some operations, ReaderT
+-- - rep loop, IO
+-- - perhaps find duplicate subtrees
+-- - eliminate unused subtrees (not necessary for lazy) 
+-- - type inference
+
+lazyM :: Term -> WriterT [String] Identity Term
+lazyM (Id x) = do tell [x]
+                  return $ Id x
+lazyM (Lam x t) = do tell [show (Lam x t)]
+                     return $ Lam x t
+lazyM (Ap t1 t2) = do tell ["evaluating first term in " ++ show (Ap t1 t2)]
+                      r <- lazyM t1
+                      tell ["first term evaluated to " ++ show r]
+                      case r of 
+                        (Lam x t) -> lazyM $ beta (Lam x t) t2
+                        otherwise -> return $ Ap r t2
 
 
+evalM term = runIdentity $ runWriterT $  lazyM term
 
-
-
-
-
-
-
+["evaluating first term in Ap (Ap (Lam \"x\" (Lam \"y\" (Id \"x\"))) (Id \"a\")) (Id \"b\")",
+"evaluating first term in Ap (Lam \"x\" (Lam \"y\" (Id \"x\"))) (Id \"a\")",
+"Lam \"x\" (Lam \"y\" (Id \"x\"))",
+"first term evaluated to Lam \"x\" (Lam \"y\" (Id \"x\"))",
+"Lam \"y\" (Id \"a\")",
+"first term evaluated to Lam \"y\" (Id \"a\")",
+"a"]
 
 
 
