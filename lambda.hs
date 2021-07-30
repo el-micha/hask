@@ -63,7 +63,7 @@ plam' = pvar' ||| papp' ||| pabs'
 -- attempt 2 with given grammar: 
 
 data Term = Id String | Ap Term Term | Lam String Term -- | Lit Int | Plus Term Term
-  deriving Show
+--  deriving Show
 
 atom = ident ||| lamb ||| paren -- ||| lit ||| plus
 
@@ -103,6 +103,9 @@ pretty (Id s) = s
 pretty (Ap t1 t2) = "(" ++ (pretty t1) ++ " " ++ (pretty t2) ++ ")"
 pretty (Lam s t) = "(%" ++ s ++ ". " ++ (pretty t) ++ ")"
 --pretty (Plus t1 t2) = "(" ++ (pretty t1) ++ "+" ++ (pretty t2) ++ ")"
+
+instance Show Term where
+  show = pretty
 
 t1 = str2term "%z.(%x y.(y x z))"
 t2 = str2term "%z.(%x y.(y x z)t)"
@@ -160,13 +163,13 @@ lazy (Ap t1 t2) = case lazy t1 of
 -- - type inference
 
 lazyM :: Term -> WriterT [String] Identity Term
-lazyM (Id x) = do tell [x]
+lazyM (Id x) = do tell [x ++ " evaluates to itself"]
                   return $ Id x
-lazyM (Lam x t) = do tell [show (Lam x t)]
+lazyM (Lam x t) = do tell [show (Lam x t) ++ " not evaluated"]
                      return $ Lam x t
 lazyM (Ap t1 t2) = do tell ["evaluating first term in " ++ show (Ap t1 t2)]
                       r <- lazyM t1
-                      tell ["first term evaluated to " ++ show r]
+                      tell ["first term " ++ show t1  ++ " evaluated to " ++ show r]
                       case r of 
                         (Lam x t) -> lazyM $ beta (Lam x t) t2
                         otherwise -> return $ Ap r t2
@@ -174,17 +177,25 @@ lazyM (Ap t1 t2) = do tell ["evaluating first term in " ++ show (Ap t1 t2)]
 
 evalM term = runIdentity $ runWriterT $  lazyM term
 
-["evaluating first term in Ap (Ap (Lam \"x\" (Lam \"y\" (Id \"x\"))) (Id \"a\")) (Id \"b\")",
-"evaluating first term in Ap (Lam \"x\" (Lam \"y\" (Id \"x\"))) (Id \"a\")",
-"Lam \"x\" (Lam \"y\" (Id \"x\"))",
-"first term evaluated to Lam \"x\" (Lam \"y\" (Id \"x\"))",
-"Lam \"y\" (Id \"a\")",
-"first term evaluated to Lam \"y\" (Id \"a\")",
-"a"]
+--disp :: (Term, [String]) -> IO ()
+disp (t, out) = forM_ out print
 
+lazyM2 :: Term -> ReaderT String (WriterT [String] Identity) Term
+lazyM2 (Id x) = do ind <- ask
+                   tell [ind ++ x ++ " evaluates to itself"]
+                   return $ Id x
+lazyM2 (Lam x t) = do ind <- ask
+                      tell [ind ++ show (Lam x t) ++ " not evaluated"]
+                      return $ Lam x t
+lazyM2 (Ap t1 t2) = do ind <- ask
+                       tell [ind ++ "evaluating first term in " ++ show (Ap t1 t2)]
+                       r <- local (++"    ") (lazyM2 t1)
+                       tell [ind ++ "first term " ++ show t1  ++ " evaluated to " ++ show r]
+                       case r of 
+                         (Lam x t) -> local (++"    ") (lazyM2 (beta (Lam x t) t2))
+                         otherwise -> return $ Ap r t2
 
-
-
+evalM2 term = runIdentity $ runWriterT $ runReaderT (lazyM2 term) "    "
 
 
 
